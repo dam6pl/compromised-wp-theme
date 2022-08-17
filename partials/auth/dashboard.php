@@ -1,3 +1,7 @@
+<?php 
+    $currentPage = (int)($_GET['page'] ?? 1);
+?>
+
 <div class="col-8">
     <button type="button" class="btn btn-outline-primary mb-3" onclick="logout()">Logout</button>
 
@@ -5,7 +9,7 @@
 
     <div class="row">
         <div class="col-6">
-            <p>Current page: <?= $_GET['page'] ?? 1 ?></p>
+            <p>Current page: <?= $currentPage ?></p>
         </div>
         <div class="col-6 d-flex justify-content-end">
             <button onclick="load_view('add')" type="button"
@@ -28,7 +32,7 @@
         $posts = new WP_Query([
             'post_type' => 'post',
             'posts_per_page' => 3,
-            'paged' => $_GET['page'] ?? 1
+            'paged' => $currentPage
         ]);
 
         foreach ($posts->get_posts() as $post) {
@@ -53,18 +57,10 @@
         </tbody>
     </table>
 
-    <?php
-    $max_posts = new WP_Query([
-        'post_type' => 'post',
-        'posts_per_page' => -1,
-    ]);
-
-    ?>
-
     <nav aria-label="Page navigation example">
         <ul class="pagination">
-            <?php foreach (range(1, ceil(count($max_posts->posts) / 3)) as $item): ?>
-                <li class="page-item <?= ($_GET['page'] ?? 1) == $item ? 'active' : '' ?>">
+            <?php foreach (range(1, $posts->max_num_pages) as $item): ?>
+                <li class="page-item <?= $currentPage == $item ? 'active' : '' ?>">
                     <button class="page-link" onclick="load_view('dashboard', {page: <?= $item?>})">
                         <?= $item ?>
                     </button>

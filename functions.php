@@ -19,102 +19,115 @@ add_action('wp_ajax_nopriv_load_view', 'load_view');
 add_action('wp_ajax_load_view', 'load_view');
 
 function load_view(): void
-{
-    require 'partials/' . $_GET['view'] . '.php';
-    die;
+{    
+    $view = filter_input(INPUT_GET, 'view');
+    $view = str_replace(['.', '/'], '', $view);
+
+    if(is_user_logged_in()) {
+        $view = "auth/{$view}";
+    }
+
+    if (!file_exists(get_stylesheet_directory() . "/partials/{$view}.php")) {
+        wp_send_json_error("View {$view} not found.", 404);
+    }
+    
+    ob_start();
+    require_once 'partials/' . $view . '.php';
+    $response = ob_get_clean();
+
+    wp_send_json_success($response);
 }
 
 add_action('wp_ajax_nopriv_login', 'login');
-add_action('wp_ajax_login', 'login');
 
 function login(): void
 {
-    $email = $_GET['email'];
-    $password = $_GET['password'];
+    $email = \filter_input(\INPUT_POST, 'email', \FILTER_SANITIZE_EMAIL);
+    $password = \filter_input(\INPUT_POST, 'password');
+    $security = \filter_input(\INPUT_POST, 'nonce');
 
-    if ($email) {
-        if ($password) {
-            $user = wp_signon(['user_login' => $email, 'user_password' => $password]);
-            if (is_wp_error($user)) {
-                echo $user->get_error_message();
-                http_response_code(400);
-                die;
-            }
-        }else {
-            echo 'Missing password!';
-            http_response_code(400);
-            die;
-        }
-    } else {
-        echo 'Missing email!';
-        http_response_code(400);
-        die;
+    if (false === isset($security) || false === \wp_verify_nonce($security, 'demo-nonce')) {
+        wp_send_json_error("Nonce is missing", 400);
     }
 
-    http_response_code(200);
-    die;
+    if (empty($email)) {
+        wp_send_json_error("Email is missing", 400);
+    }
+
+    if (empty($password)) {
+        wp_send_json_error("Password is missing.", 400);
+    }
+
+    $user = wp_signon(['user_login' => $email, 'user_password' => $password]);
+
+    if (is_wp_error($user)) {
+        wp_send_json_error($user->get_error_message(), 400);
+    }
+
+    wp_send_json_success();
 }
 
-add_action('wp_ajax_nopriv_post_delete', 'post_delete');
 add_action('wp_ajax_post_delete', 'post_delete');
 
 function post_delete(): void
 {
-    $post_id = $_GET['post'];
-
-    if ($post_id) {
-        $delete = wp_delete_post($post_id);
-
-            if (!$delete) {
-                echo 'Post cannot be delted';
-                http_response_code(400);
-                die;
-            }
-
-    } else {
-        echo 'Invalid post id!';
-        http_response_code(400);
-        die;
+    if (!\current_user_can('delete_posts')) {
+        \wp_send_json_error('You are not allowed to delete post. Please contact with administrator.');
     }
 
-    http_response_code(200);
-    die;
+    $postId = (int)($_GET['post'] ?? 0);
+
+    if (!$postId) {
+        wp_send_json_error("Wrong post ID.", 400);
+    }
+    
+    if ('post' !== get_post_type($postId)) {
+        wp_send_json_error("Wrong post type.", 400);
+    }
+
+    $delete = wp_delete_post($postId);
+
+    if (!$delete) {
+        wp_send_json_error("Post cannot be deleted.", 400);
+    }
+
+    wp_send_json_success();
 }
 
-add_action('wp_ajax_nopriv_post_insert', 'post_insert');
 add_action('wp_ajax_post_insert', 'post_insert');
 
 function post_insert(): void
 {
-    $post = json_decode(stripslashes($_GET['post']), true);
-    $post = filter_var_array($post);
 
-    if ($post) {
-        $post = wp_insert_post($post);
-
-        if (is_wp_error($post)) {
-            echo $post->get_error_message();
-            http_response_code(400);
-            die;
-        }
-
-    } else {
-        echo 'Invalid post!';
-        http_response_code(400);
-        die;
+    if (!\current_user_can('create_posts')) {
+        \wp_send_json_error('You are not allowed to create post. Please contact with administrator.');
     }
 
-    http_response_code(200);
-    die;
+    $title = \filter_input(\INPUT_POST, 'title');
+    $content = \filter_input(\INPUT_POST, 'content');
+
+    if (empty($title)) {
+        \wp_send_json_error('You need post title.');
+    }
+
+    $postData = [
+        'post_title' => $title ?: '',
+        'post_content' => $content ?: '',
+    ];
+    $post = wp_insert_post($postData, true);
+
+    if (is_wp_error($post)) {
+        \wp_send_json_error($post->get_error_message(), 400);
+    }
+
+    \wp_send_json_success();
 }
 
-add_action('wp_ajax_nopriv_logout', 'logout');
 add_action('wp_ajax_logout', 'logout');
 
 function logout(): void
 {
-    wp_logout();
+    \wp_logout();
 
-    http_response_code(200);
-    die;
+    \wp_send_json_success();
 }

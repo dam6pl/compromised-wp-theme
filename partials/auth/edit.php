@@ -1,6 +1,6 @@
 <div class="col-8">
     <div class="alert alert-warning mb-3 d-none" id="response-error" role="alert"></div>
-    <?php $post = get_post($_GET['post']) ?>
+    <?php $post = get_post(((int)$_GET['post'] ?? 0)) ?>
     <h3>Edit: <?= $post->post_title ?></h3>
 
     <form id="edit-form" onsubmit="insertPost(event)">
